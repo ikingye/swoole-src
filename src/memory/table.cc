@@ -377,6 +377,7 @@ int swTableRow_del(swTable *table, const char *key, int keylen)
         }
         else
         {
+            printf("no found[2], key1=%s[len=%d], key2=%s[len=%d]\n", key, keylen,  row->key, row->key_len);
             goto _not_exists;
         }
     }
@@ -405,20 +406,20 @@ int swTableRow_del(swTable *table, const char *key, int keylen)
         //and remove the element from the collision list.
         if (tmp == row)
         {
-            swTableRow *next = tmp->next;
-            row->next = next;
-            memcpy(row->key, next->key, tmp->key_len + 1);
-            memcpy(row->data, next->data, table->item_size);
+            tmp = tmp->next;
+            row->next = tmp->next;
+            memcpy(row->key, tmp->key, tmp->key_len + 1);
+            row->key_len = tmp->key_len;
+            memcpy(row->data, tmp->data, table->item_size);
         }
-        else if (prev)
+        if (prev)
         {
             prev->next = tmp->next;
-
-            table->lock.lock(&table->lock);
-            bzero(tmp, sizeof(swTableRow));
-            table->pool->free(table->pool, tmp);
-            table->lock.unlock(&table->lock);
         }
+        table->lock.lock(&table->lock);
+        bzero(tmp, sizeof(swTableRow) + table->item_size);
+        table->pool->free(table->pool, tmp);
+        table->lock.unlock(&table->lock);
     }
 
     _delete_element:
