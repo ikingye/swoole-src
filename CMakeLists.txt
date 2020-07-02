@@ -4,8 +4,6 @@ ENABLE_LANGUAGE(ASM)
 SET(SWOOLE_VERSION 4.5.3-alpha)
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 set(SWOOLE_CLFLAGS pthread dl)
@@ -18,38 +16,13 @@ endif()
 
 SET(CMAKE_BUILD_TYPE Debug)
 
-# Code Coverage Configuration
-add_library(coverage_config INTERFACE)
-
-option(CODE_COVERAGE "Enable coverage reporting" OFF)
-if(CODE_COVERAGE)
-    message(STATUS "Open coverage")
-    # --coverage => -fprofile-arcs -ftest-coverage
-    target_compile_options(coverage_config INTERFACE
-        -O0
-        -g
-        --coverage
-    )
-    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
-        target_link_options(coverage_config INTERFACE --coverage)
-    else()
-        target_link_libraries(coverage_config INTERFACE --coverage)
-    endif()
-endif(CODE_COVERAGE)
-
-file(GLOB_RECURSE SRC_LIST FOLLOW_SYMLINKS src/*.c src/*.cc thirdparty/boost/asm/combined.S)
 file(GLOB_RECURSE HEAD_FILES FOLLOW_SYMLINKS include/*.h)
 file(GLOB_RECURSE HEAD_WAPPER_FILES FOLLOW_SYMLINKS include/wrapper/*.hpp)
 
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-#message(STATUS "source=${SRC_LIST}")
-#message(STATUS "header=${HEAD_FILES}")
-
 add_definitions(-DHAVE_CONFIG_H)
-# test
-#add_definitions(-DSW_USE_THREAD_CONTEXT)
 
 include_directories(BEFORE ./include ./include/wrapper ./)
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
@@ -74,19 +47,12 @@ if (DEFINED brotli_dir)
     link_directories(${brotli_dir}/lib)
 endif()
 
+add_subdirectory(src)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/lib)
+
 execute_process(COMMAND php-config --includes OUTPUT_VARIABLE PHP_INCLUDES OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND php-config --extension-dir OUTPUT_VARIABLE PHP_EXTENSION_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PHP_INCLUDES}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PHP_INCLUDES}")
-
-# lib-swoole
-link_directories(${LIBRARY_OUTPUT_PATH})
-add_library(lib-swoole SHARED ${SRC_LIST})
-set_target_properties(lib-swoole PROPERTIES OUTPUT_NAME "swoole" VERSION ${SWOOLE_VERSION})
-target_link_libraries(lib-swoole ${SWOOLE_CLFLAGS})
-if(CODE_COVERAGE)
-    target_link_libraries(lib-swoole coverage_config gcov)
-endif(CODE_COVERAGE)
 
 # test_server
 set(TEST_SRC_LIST examples/cpp/test_server.cc)
@@ -126,6 +92,7 @@ set(ext_src_list  ${ext_cxx_files}
 add_library(ext-swoole SHARED ${ext_src_list})
 set_target_properties(ext-swoole PROPERTIES PREFIX "")
 set_target_properties(ext-swoole PROPERTIES OUTPUT_NAME "swoole")
+target_compile_options(ext-swoole PRIVATE -Wall -g)
 add_dependencies(ext-swoole lib-swoole)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -141,6 +108,15 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 target_link_libraries(ext-swoole ${SWOOLE_CLFLAGS} swoole)
+
+message(STATUS "summary of build options:
+    Install prefix:  ${CMAKE_INSTALL_PREFIX}
+    Target system:   ${CMAKE_SYSTEM_NAME}
+    Compiler:
+      C compiler:    ${CMAKE_C_COMPILER}
+      CXX compiler:  ${CMAKE_CXX_COMPILER}
+      CXXFLAGS:      ${CMAKE_CXX_FLAGS}
+")
 
 #install
 INSTALL(CODE "MESSAGE(\"Are you run command using root user?\")")
